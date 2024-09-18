@@ -1,0 +1,46 @@
+{
+    "kpts": [3, 3, 1],
+    "pseudopotentials": {
+        "Mo": "Mo_ONCV_PBE-1.2.upf",
+        "S": "S_ONCV_PBE-1.2.upf",
+        "W": "W_ONCV_PBE-1.2.upf",
+        "Se": "Se_ONCV_PBE-1.2.upf"
+    },
+    "input_data": {
+        "relax": {
+            "control": {
+                "prefix": "1D_MoS2WSe2",
+                "calculation": "relax",
+                "restart_mode": "restart",
+                "max_seconds": 1450,
+                "disk_io": "low",
+                "verbosity": "high",
+                "tefield": true,
+                "dipfield": true,
+                "tstress": false,
+                "tprnfor": false,
+                "outdir": "./tmp",
+                "forc_conv_thr": 0.0001,
+                "nstep": 400
+            },
+            "system": {
+                "ecutwfc": 35.0,
+                "occupations": "smearing",
+                "smearing": "gauss",
+                "degauss": 0.005,
+                "edir": 3,
+                "emaxpos": 0.0,
+                "input_dft": "vdw-df-c09"
+            },
+            "electrons": {
+                "conv_thr": "1.0d-10",
+                "mixing_mode": "local-TF",
+                "mixing_ndim": 12,
+                "mixing_beta": 0.3
+            },
+            "ions": {
+                "ion_dynamics": "damp"
+            }
+        }
+    }
+}
