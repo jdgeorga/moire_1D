@@ -31,7 +31,7 @@ def create_moire_1d(
     Rmax_max_search: int = 50,
     max_iter_twist_search: int = 4,
     output_plot_name: str = "best_moire_found.png",
-    stiffness_tensors: np.ndarray = None,
+    stiffness_tensors = None,
 ):
     """
     Create a moire pattern for 1D structures.
