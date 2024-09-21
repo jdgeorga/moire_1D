@@ -29,24 +29,22 @@ Usage:
 """
 
 # Input parameters
-structures_dir = "/home1/08526/jdgeorga/SCRATCH/moire_1D_relaxation/pymoire/pymoire/c2db_structures"
-structure_files = ["MoS2_c2db.xyz","WSe2_c2db.xyz"]
+structures_dir = "/pscratch/sd/j/jdgeorga/twist-anything/1D_moire/pymoire/pymoire/c2db_structures"
+structure_files = ["MoS2_c2db.xyz", "WSe2_c2db.xyz"]
 structure_file_format = "extxyz"
 output_struc_name = "MoS2_WSe2_1D.xyz"
-twist_min_search = 0
-
-twist_max_search = 1e-6
-desired_strain = 1e-3
-max_permissible_strain = 0.2
-is_1D_dir_1 = False
-is_1D_dir_2 = True
+twist_min_search = 0.0
+twist_max_search = 1e-10
+desired_strain = 1e-2
+max_permissible_strain = 0.3
+is_1D_dir_1 = True
+is_1D_dir_2 = False
 Rmax_max_search = 15
 max_iter_twist_search = 5
 output_plot_name = "my_moire_plot.png"
 
 # Optional: Specify custom stiffness tensors
 # If you don't want to use custom stiffness tensors, set this to None
-# stiffness_tensors = None
 # Example of custom stiffness tensors:
 stiffness_tensors = np.array([
     [[131.34, 32.84, -0.00], [32.88, 131.28, -0.00], [0.00, 0.00, 98.74]],
