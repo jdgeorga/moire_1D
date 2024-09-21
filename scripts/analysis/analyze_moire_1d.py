@@ -9,7 +9,7 @@ from ase.geometry import get_distances
 from ase.io import read
 
 def load_atomic_positions(file_path: str) -> List[Atoms]:
-    return read(file_path, index=':')  # This reads all frames from an XYZ file
+    return read(file_path, index=':-1')  # This reads all frames from an XYZ file
 
 def save_heatmap(data: np.ndarray, x_label: str, y_label: str, title: str, filename: str):
     plt.figure(figsize=(10, 6))
@@ -21,24 +21,29 @@ def save_heatmap(data: np.ndarray, x_label: str, y_label: str, title: str, filen
     plt.savefig(filename)
     plt.close()
 
-def save_animated_gif(frames: List[np.ndarray], x_label: str, y_label: str, title: str, filename: str):
+def save_animated_gif(frames: List[np.ndarray], x_label: str, y_label: str, title: str, filename: str, total_frames: int = 100):
     fig, ax = plt.subplots(figsize=(10, 6))
+    
+    # Calculate the step size to achieve the desired number of frames
+    step = max(1, len(frames) // total_frames)
+    selected_frames = frames[::step]
     
     def update(frame):
         ax.clear()
         im = ax.imshow(frame, cmap='coolwarm', aspect='auto', interpolation='nearest')
-        if frame == frames[0]:
+        if frame == selected_frames[0]:
             plt.colorbar(im, label='Value')
         ax.set_xlabel(x_label)
         ax.set_ylabel(y_label)
         ax.set_title(title)
     
-    anim = FuncAnimation(fig, update, frames=frames, interval=200)
+    anim = FuncAnimation(fig, update, frames=selected_frames, interval=200)
     anim.save(filename, writer='pillow')
     plt.close()
 
 def aggregate_atomic_displacement(positions: np.ndarray, initial_positions: np.ndarray, num_bins: int) -> np.ndarray:
-    num_steps, num_atoms = positions.shape
+    num_steps = positions.shape[0]
+    num_atoms = positions.shape[1]
     displacements = positions - initial_positions
     
     bin_edges = np.linspace(0, num_atoms, num_bins + 1, dtype=int)
@@ -48,6 +53,8 @@ def aggregate_atomic_displacement(positions: np.ndarray, initial_positions: np.n
         for bin in range(num_bins):
             start, end = bin_edges[bin], bin_edges[bin + 1]
             heatmap_data[step, bin] = np.mean(displacements[step, start:end])
+            
+    print(heatmap_data.shape)
     
     return heatmap_data
 
@@ -246,28 +253,50 @@ def visualize_average_order_parameter(atoms_list: List[Atoms], num_bins: int):
                    'Average Order Parameter vs Relaxation Steps', 'average_order_parameter_line_plot.png')
 
 def main():
+    print("Starting analysis...")
+    
     # Load atomic positions data as ASE Atoms objects
-    atoms_list = load_atomic_positions('path_to_positions_file.xyz')
+    print("\n1. Loading atomic positions data...")
+    atoms_list = load_atomic_positions('MoS2_WSe2_1D_lammps.traj.xyz')
+    print("   Atomic positions loaded successfully.")
     
     # Define parameters
-    num_bins = 50
+    num_bins = 12
     
     # Run analyses
     positions = np.array([atoms.get_positions() for atoms in atoms_list])
     initial_positions = positions[0]
     
+    print("\n2. Analyzing atomic displacement...")
     visualize_atomic_displacement(positions, initial_positions, num_bins)
+    print("   Atomic displacement analysis complete.")
+    
+    print("\n3. Analyzing strain evolution...")
     visualize_strain_evolution(positions, initial_positions, num_bins)
+    print("   Strain evolution analysis complete.")
     
-    # Use the actual potential from atoms objects
+    print("\n4. Analyzing energy decay...")
     visualize_energy_decay(atoms_list)
+    print("   Energy decay analysis complete.")
     
+    print("\n5. Performing Fourier transform analysis...")
     visualize_fourier_transform(positions)
+    print("   Fourier transform analysis complete.")
+    
+    print("\n6. Analyzing distance distribution...")
     visualize_distance_distribution(positions, num_bins)
+    print("   Distance distribution analysis complete.")
     
     # Order parameter analyses
+    print("\n7. Analyzing order parameter evolution...")
     visualize_order_parameter_evolution(atoms_list, 'order_parameter_evolution.gif')
+    print("   Order parameter evolution analysis complete.")
+    
+    print("\n8. Analyzing average order parameter...")
     visualize_average_order_parameter(atoms_list, num_bins)
+    print("   Average order parameter analysis complete.")
+    
+    print("\nAll analyses completed successfully!")
 
 if __name__ == "__main__":
     main()
