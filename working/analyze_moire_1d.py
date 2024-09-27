@@ -350,61 +350,226 @@ def visualize_energy_decay(atoms_list: List[Atoms], title_prefix: str):
 
     print("   Energy decay visualization complete.")
 
-def calculate_fourier_transform(positions: np.ndarray) -> np.ndarray:
-    num_steps = positions.shape[0]
-    num_atoms = positions.shape[1]
-    k = np.fft.fftfreq(num_atoms)
-    ft_data = np.zeros((num_steps, num_atoms), dtype=complex)
-    
+def calculate_fourier_transform(positions: np.ndarray, a1: np.ndarray, a2: np.ndarray) -> np.ndarray:
+    """
+    Calculate the Fourier transform of 2D atomic positions relative to the reciprocal lattice vectors.
+
+    Args:
+        positions (np.ndarray): Array of shape (num_steps, num_atoms, 2) containing 2D positions.
+        a1 (np.ndarray): Lattice vector a1.
+        a2 (np.ndarray): Lattice vector a2.
+
+    Returns:
+        np.ndarray: Fourier transform magnitudes of shape (num_steps, num_kpoints).
+    """
+    num_steps, num_atoms, _ = positions.shape
+
+    # Calculate reciprocal lattice vectors
+    area = np.abs(a1[0]*a2[1] - a1[1]*a2[0])
+    b1 = (2 * np.pi / area) * np.array([a2[1], -a2[0]])
+    b2 = (2 * np.pi / area) * np.array([-a1[1], a1[0]])
+
+    # Define k-points in the reciprocal lattice
+    k_range = range(-5, 6)  # Adjust the range as needed
+    k_points = []
+    for i in k_range:
+        for j in k_range:
+            k = i * b1 + j * b2
+            k_points.append(k)
+    k_points = np.array(k_points)
+
+    ft_data = np.zeros((num_steps, len(k_points)), dtype=complex)
+
     for step in range(num_steps):
-        ft_data[step] = fft(np.exp(-1j * 2 * np.pi * k[:, np.newaxis] * positions[step]))
+        for idx, k in enumerate(k_points):
+            phase = np.exp(-1j * (positions[step, :, 0] * k[0] + positions[step, :, 1] * k[1]))
+            ft_data[step, idx] = np.sum(phase)
     
     return np.abs(ft_data)
 
-def visualize_fourier_transform(positions: np.ndarray, title_prefix: str):
-    ft_data = calculate_fourier_transform(positions)
-    
-    save_heatmap(ft_data, 'Wavevector k', 'Relaxation Steps', 
-                 f'{title_prefix} - Dynamic Fourier Transform Evolution', 'analysis_plots/fourier_transform/fourier_transform_heatmap.png')
-    
-    save_animated_gif([ft_data[:i+1] for i in range(len(ft_data))],
-                      'Wavevector k', 'Relaxation Steps', 
-                      f'{title_prefix} - Dynamic Fourier Transform Evolution', 'analysis_plots/fourier_transform/fourier_transform_animation.gif')
+def visualize_fourier_transform(
+    positions: np.ndarray,
+    a1: np.ndarray,
+    a2: np.ndarray,
+    title_prefix: str
+):
+    """
+    Visualize the Fourier transform in reciprocal lattice directions and the Brillouin zone.
 
-def calculate_distance_distribution(positions: np.ndarray, num_bins: int) -> Tuple[np.ndarray, np.ndarray]:
-    num_steps, num_atoms = positions.shape
-    distances = np.diff(positions, axis=1)
-    
-    all_distances = distances.flatten()
-    hist_range = (np.min(all_distances), np.max(all_distances))
-    
-    histograms = np.zeros((num_steps, num_bins))
-    bin_edges = np.linspace(hist_range[0], hist_range[1], num_bins + 1)
-    
-    for step in range(num_steps):
-        histograms[step], _ = np.histogram(distances[step], bins=bin_edges, density=True)
-    
-    return histograms, bin_edges
+    Args:
+        positions (np.ndarray): Array of shape (num_steps, num_atoms, 2) containing 2D positions.
+        a1 (np.ndarray): Lattice vector a1.
+        a2 (np.ndarray): Lattice vector a2.
+        title_prefix (str): Prefix for plot titles.
+    """
+    print("\n4. Revamping Fourier Transform Visualization...")
 
-def visualize_distance_distribution(positions: np.ndarray, num_bins: int, title_prefix: str):
-    histograms, bin_edges = calculate_distance_distribution(positions, num_bins)
-    
-    save_heatmap(histograms.T, 'Relaxation Steps', 'Interatomic Distance', 
-                 f'{title_prefix} - Interatomic Distance Distribution Evolution', 'analysis_plots/distance_distribution/distance_distribution_heatmap.png')
-    
-    fig, ax = plt.subplots(figsize=(10, 6))
-    
+    # Calculate Fourier transform
+    ft_data = calculate_fourier_transform(positions, a1, a2)
+
+    # Define reciprocal lattice vectors
+    area = np.abs(a1[0]*a2[1] - a1[1]*a2[0])
+    b1 = (2 * np.pi / area) * np.array([a2[1], -a1[0]])
+    b2 = (2 * np.pi / area) * np.array([-a1[1], a1[0]])
+
+    # Project Fourier components onto b1 and b2
+    ft_b1 = np.dot(ft_data, b1) / len(b1)**2
+    ft_b2 = np.dot(ft_data, b2) / len(b2)**2
+
+    steps = np.arange(ft_data.shape[0])
+
+    # Plot Fourier components in b1 and b2 directions
+    plt.figure(figsize=(12, 6))
+
+    plt.subplot(1, 2, 1)
+    plt.plot(steps, ft_b1, label='FT along b1')
+    plt.xlabel('Relaxation Step')
+    plt.ylabel('Fourier Component')
+    plt.title(f'{title_prefix} - FT Components along b1')
+    plt.legend()
+
+    plt.subplot(1, 2, 2)
+    plt.plot(steps, ft_b2, label='FT along b2', color='orange')
+    plt.xlabel('Relaxation Step')
+    plt.ylabel('Fourier Component')
+    plt.title(f'{title_prefix} - FT Components along b2')
+    plt.legend()
+
+    plt.tight_layout()
+    ensure_directory('analysis_plots/fourier_transform')
+    plt.savefig('analysis_plots/fourier_transform/ft_components_b1_b2.png')
+    plt.close()
+
+    # Define k-points for Brillouin zone plotting
+    num_steps, num_kpoints = ft_data.shape
+    k_range = range(-5, 6)  # Ensure consistency with calculate_fourier_transform
+    k_points = []
+    for i in k_range:
+        for j in k_range:
+            k = i * b1 + j * b2
+            k_points.append(k)
+    k_points = np.array(k_points)
+
+    # Normalize Fourier transform for coloring
+    ft_normalized = ft_data / np.max(ft_data)
+
+    # Plot Brillouin zone with Fourier transform coloring
+    fig, ax = plt.subplots(figsize=(8, 8))
+
     def update(frame):
         ax.clear()
-        ax.bar(bin_edges[:-1], histograms[frame], width=np.diff(bin_edges), align='edge')
-        ax.set_xlabel('Interatomic Distance')
-        ax.set_ylabel('Probability Density')
-        ax.set_title(f'{title_prefix} - Interatomic Distance Distribution (Step {frame})')
-    
-    anim = FuncAnimation(fig, update, frames=len(histograms), interval=200)
-    ensure_directory('analysis_plots/distance_distribution')
-    anim.save('analysis_plots/distance_distribution/distance_distribution_animation.gif', writer='pillow')
+        sc = ax.scatter(
+            k_points[:, 0],
+            k_points[:, 1],
+            c=ft_normalized[frame],
+            cmap='viridis',
+            s=50,
+            edgecolor='k'
+        )
+        ax.set_xlabel('$k_x$')
+        ax.set_ylabel('$k_y$')
+        ax.set_title(f'{title_prefix} - Brillouin Zone FT (Step {frame})')
+        plt.colorbar(sc, ax=ax, label='Normalized FT')
+        ax.set_aspect('equal')
+
+    anim = FuncAnimation(fig, update, frames=num_steps, interval=200)
+    anim.save('analysis_plots/fourier_transform/brillouin_zone_ft_animation.gif', writer='pillow')
     plt.close()
+
+    print("   Fourier transform visualization revamped successfully.")
+
+def calculate_distance_distribution(atoms_list: List[Atoms], num_bins: int) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Calculate the distribution of interatomic distances for each relaxation step, considering periodic boundaries.
+
+    Args:
+        atoms_list (List[Atoms]): List of ASE Atoms objects for each relaxation step.
+        num_bins (int): Number of bins for the histogram.
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: A tuple containing the histograms and the bin edges.
+            - histograms: Array of shape (num_steps, num_bins) with counts of distances.
+            - bin_edges: Array of bin edge values.
+    """
+    num_steps = len(atoms_list)
+    all_distances = []
+
+    for idx, atoms in enumerate(atoms_list):
+        # Obtain all pairwise distances with minimum image convention
+        distances = atoms.get_all_distances(mic=True)
+        
+        # Extract the upper triangle of the distance matrix without the diagonal
+        triu_indices = np.triu_indices(len(atoms), k=1)
+        unique_distances = distances[triu_indices]
+        
+        all_distances.append(unique_distances)
+        print(f"Step {idx+1}/{num_steps}: Calculated {len(unique_distances)} unique interatomic distances.")
+
+    # Determine global minimum and maximum distances for consistent binning
+    all_dists_flat = np.concatenate(all_distances)
+    min_dist = all_dists_flat.min()
+    max_dist = all_dists_flat.max()
+    bin_edges = np.linspace(min_dist, max_dist, num_bins + 1)
+
+    # Initialize histograms array
+    histograms = np.zeros((num_steps, num_bins), dtype=int)
+
+    for i, distances in enumerate(all_distances):
+        hist, _ = np.histogram(distances, bins=bin_edges)
+        histograms[i] = hist
+        print(f"Step {i+1}: Histogram computed.")
+
+    return histograms, bin_edges
+
+
+def visualize_distance_distribution(atoms_list: List[Atoms], num_bins: int, title_prefix: str):
+    """
+    Visualize the interatomic distance distributions by creating:
+    1. A figure with two subplots showing the distribution at the first and last relaxation steps.
+    2. A heatmap showing the evolution of distance distributions over relaxation steps.
+
+    Args:
+        atoms_list (List[Atoms]): List of ASE Atoms objects for each relaxation step.
+        num_bins (int): Number of bins for the histogram.
+        title_prefix (str): Prefix for the plot titles.
+    """
+    print("\nRevamping distance distribution calculation with periodicity...")
+
+    # Calculate distance distributions
+    histograms, bin_edges = calculate_distance_distribution(atoms_list, num_bins)
+    num_steps = len(atoms_list)
+
+    # 1. Create subplots for the first and last step
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+    steps_to_plot = [0, -1]  # First and last steps
+
+    for ax, step in zip(axes, steps_to_plot):
+        ax.bar(bin_edges[:-1], histograms[step], width=np.diff(bin_edges), align='edge', color='skyblue', edgecolor='black')
+        ax.set_xlabel('Interatomic Distance (Å)', fontsize=12)
+        ax.set_ylabel('Count', fontsize=12)
+        step_number = step + 1 if step >=0 else num_steps + step +1
+        ax.set_title(f'{title_prefix} - Distance Distribution (Step {step_number})', fontsize=14)
+        ax.grid(True, linestyle='--', alpha=0.7)
+
+    plt.tight_layout()
+    subplot_filename = 'analysis_plots/distance_distribution/distance_distribution_subplots.png'
+    ensure_directory(os.path.dirname(subplot_filename))
+    plt.savefig(subplot_filename)
+    plt.close()
+    print(f"Saved distance distribution subplots to {subplot_filename}")
+
+    # 2. Create heatmap of distance distributions over relaxation steps
+    heatmap_filename = 'analysis_plots/distance_distribution/distance_distribution_heatmap.png'
+    save_heatmap(
+        data=histograms,
+        x_label='Interatomic Distance (Å)',
+        y_label='Relaxation Step',
+        title=f'{title_prefix} - Interatomic Distance Distribution Evolution',
+        filename=heatmap_filename
+    )
+    print(f"Saved distance distribution heatmap to {heatmap_filename}")
+
+    print("Distance distribution visualization revamped successfully.")
 
 def calculate_order_parameter(atoms: Atoms) -> np.ndarray:
     positions = atoms.get_positions()
@@ -474,8 +639,8 @@ def run_selected_analyses(atoms_list: List[Atoms], title_prefix: str, focus_atom
         1: ("Atomic displacement", visualize_atomic_displacement),
         2: ("Strain evolution", visualize_strain_evolution),
         3: ("Energy decay", visualize_energy_decay),
-        4: ("Fourier transform", lambda al, tp: visualize_fourier_transform(np.array([a.get_positions() for a in al]), tp)),
-        5: ("Distance distribution", lambda al, nb, tp: visualize_distance_distribution(np.array([a.get_positions() for a in al]), nb, tp)),
+        4: ("Fourier transform", visualize_fourier_transform),
+        5: ("Distance distribution", lambda al, tp: visualize_distance_distribution(al, 100, tp)),
         6: ("Order parameter evolution", visualize_order_parameter_evolution),
         7: ("Average order parameter", visualize_average_order_parameter)
     }
@@ -491,16 +656,24 @@ def run_selected_analyses(atoms_list: List[Atoms], title_prefix: str, focus_atom
     else:
         selected_keys = [int(k.strip()) for k in selected.split(',') if k.strip().isdigit()]
 
+    # Define lattice vectors a1 and a2
+    # These should be defined based on your specific lattice. Example:
+    a1 = np.array([3.16, 0.0])  # Replace with actual lattice vector a1
+    a2 = np.array([1.58, 2.74])  # Replace with actual lattice vector a2
+
     for key in selected_keys:
         if key in analyses:
             name, func = analyses[key]
             print(f"\nRunning analysis: {name}")
-            if key in [1, 2, 6, 7]:
+            if key == 4:
+                print("Not Working Yet")
+                continue
+                positions_2d = np.array([atoms.get_positions()[:, :2] for atoms in atoms_list])
+                func(positions_2d, a1, a2, title_prefix)
+            elif key in [1, 2, 6, 7]:
                 func(atoms_list, title_prefix, focus_atom_types)
-            elif key == 3:
+            elif key in [3, 5]:
                 func(atoms_list, title_prefix)
-            elif key in [4, 5]:
-                func(atoms_list, 12, title_prefix)
             print(f"Analysis complete: {name}")
         else:
             print(f"Invalid analysis number: {key}")
@@ -512,6 +685,14 @@ def main():
     print("\n1. Loading atomic positions data...")
     atoms_list = load_atomic_positions('MoS2_WSe2_1D_lammps.traj.xyz', 'MoS2_WSe2_1D.xyz')
     print("   Atomic positions loaded successfully.")
+    
+    # Define lattice vectors a1 and a2
+    # These should be set according to your system's lattice. Example:
+    a1 = np.array([3.16, 0.0])  # Replace with actual lattice vector a1
+    a2 = np.array([1.58, 2.74])  # Replace with actual lattice vector a2
+    
+    # Extract 2D positions
+    positions_2d = np.array([atoms.get_positions()[:, :2] for atoms in atoms_list])
     
     # Define parameters
     title_prefix = "MoS2-WSe2 1D Moire"

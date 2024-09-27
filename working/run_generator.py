@@ -32,14 +32,14 @@ Usage:
 structures_dir = "/pscratch/sd/j/jdgeorga/twist-anything/1D_moire/pymoire/pymoire/c2db_structures"
 structure_files = ["MoS2_c2db.xyz", "WSe2_c2db.xyz"]
 structure_file_format = "extxyz"
-output_struc_name = "MoS2_WSe2_1D.xyz"
-twist_min_search = 0.0
-twist_max_search = 1e-10
-desired_strain = 1e-2
-max_permissible_strain = 0.3
-is_1D_dir_1 = True
+output_struc_name = "MoS2_WSe2_2D_big.xyz"
+twist_min_search = .1
+twist_max_search = 1.5
+desired_strain = 1e-4
+max_permissible_strain = 1e-3
+is_1D_dir_1 = False
 is_1D_dir_2 = False
-Rmax_max_search = 15
+Rmax_max_search = 30
 max_iter_twist_search = 5
 output_plot_name = "my_moire_plot.png"
 
